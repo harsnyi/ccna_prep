@@ -1,0 +1,36 @@
+CCNA.addDay("d34", {
+  "cards": [
+    {"id": "d34-c01", "front": "What is an ACL in the security context?", "back": "A **packet filter** that tells the router to permit or deny specific traffic."},
+    {"id": "d34-c02", "front": "What is an ACE?", "back": "Access Control **Entry** — one line of an ACL. An ACL is an ordered sequence of ACEs."},
+    {"id": "d34-c03", "front": "How does a router process an ACL?", "back": "Top to bottom; at the **first match** it takes the action and **stops** — later entries are ignored."},
+    {"id": "d34-c04", "front": "What happens to traffic that matches no ACE?", "back": "It is **denied** by the **implicit deny** at the end of every ACL."},
+    {"id": "d34-c05", "front": "Does configuring an ACL in global config make it take effect?", "back": "No — it must be **applied to an interface**, inbound or outbound."},
+    {"id": "d34-c06", "front": "Standard ACLs match on what?", "back": "**Only the source IP address.**"},
+    {"id": "d34-c07", "front": "Number ranges for standard numbered ACLs?", "back": "**1–99** and **1300–1999**"},
+    {"id": "d34-c08", "front": "Number ranges for extended numbered ACLs?", "back": "**100–199** and **2000–2699**"},
+    {"id": "d34-c09", "front": "Syntax of a standard numbered ACL entry?", "back": "`access-list <number> {deny | permit} <ip> <wildcard-mask>`"},
+    {"id": "d34-c10", "front": "3 equivalent ways to deny host 1.1.1.1 in ACL 1?", "back": "`access-list 1 deny 1.1.1.1 0.0.0.0` · `access-list 1 deny 1.1.1.1` · `access-list 1 deny host 1.1.1.1`"},
+    {"id": "d34-c11", "front": "2 ways to permit all traffic in ACL 1?", "back": "`access-list 1 permit any` · `access-list 1 permit 0.0.0.0 255.255.255.255`"},
+    {"id": "d34-c12", "front": "Add a description to ACL 1?", "back": "`access-list 1 remark <text>`"},
+    {"id": "d34-c13", "front": "Apply ACL 1 outbound on an interface?", "back": "`R1(config-if)# ip access-group 1 out`"},
+    {"id": "d34-c14", "front": "Where should **standard** ACLs be placed? Why?", "back": "As **close to the destination** as possible — they only match source IP, so placing them near the source could block traffic to other destinations."},
+    {"id": "d34-c15", "front": "Where should **extended** ACLs be placed?", "back": "As **close to the source** as possible (they can match destination too, so drop unwanted traffic early)."},
+    {"id": "d34-c16", "front": "Create a standard named ACL called BLOCK_BOB?", "back": "`R1(config)# ip access-list standard BLOCK_BOB` → enters `R1(config-std-nacl)#`"},
+    {"id": "d34-c17", "front": "Syntax inside named standard ACL mode?", "back": "`[entry-number] {deny | permit} <ip> <wildcard-mask>`"},
+    {"id": "d34-c18", "front": "Wildcard mask for a /32 host? For /24?", "back": "/32 → `0.0.0.0` · /24 → `0.0.0.255` (wildcard = 255.255.255.255 − subnet mask)"},
+    {"id": "d34-c19", "front": "Why may `show access-lists` show host entries in a different order than configured?", "back": "IOS may **reorder /32 host entries** for efficiency (above range entries) — it doesn't change the matching result. Packet Tracer doesn't reorder."},
+    {"id": "d34-c20", "front": "How many ACLs can be applied to one interface?", "back": "**One per direction** (one inbound + one outbound) per interface (per protocol)."}
+  ],
+  "questions": [
+    {"id": "d34-q01", "type": "single", "q": "A standard ACL filters traffic based on which field?", "options": ["Destination IP", "Source IP", "Source and destination IP", "Layer 4 port"], "answer": [1], "explain": "Standard ACLs match **only the source IP**. Extended ACLs can match source/destination IP, protocol and ports."},
+    {"id": "d34-q02", "type": "multi", "q": "Which TWO number ranges can be used for standard numbered ACLs? (Choose two.)", "options": ["1–99", "100–199", "1300–1999", "2000–2699", "200–299"], "answer": [0, 2], "explain": "Standard: 1–99, 1300–1999. Extended: 100–199, 2000–2699."},
+    {"id": "d34-q03", "type": "single", "q": "ACL 10:\n`access-list 10 permit 192.168.1.0 0.0.0.255`\n`access-list 10 deny 192.168.1.5`\nWhat happens to a packet from 192.168.1.5?", "options": ["Denied by the second entry", "Permitted by the first entry", "Denied by the implicit deny", "Dropped because the ACL is invalid"], "answer": [1], "explain": "ACLs are processed top-down and stop at the first match. 192.168.1.5 matches the first (permit) entry, so the deny is never reached."},
+    {"id": "d34-q04", "type": "single", "q": "ACL 5 contains only `access-list 5 deny 10.0.0.0 0.255.255.255` and is applied inbound. What happens to traffic from 172.16.1.1?", "options": ["Permitted, because it doesn't match the deny", "Denied by the implicit deny", "Permitted, because ACLs only affect matching traffic", "Forwarded but logged"], "answer": [1], "explain": "Every ACL ends with an implicit `deny any`. An ACL with only deny entries blocks everything — add `permit any` at the end."},
+    {"id": "d34-q05", "type": "single", "q": "Which command applies standard ACL 1 to filter traffic **leaving** interface G0/2?", "options": ["`access-list 1 out g0/2`", "`ip access-group 1 out`", "`ip access-class 1 out`", "`ip access-list 1 out`"], "answer": [1], "explain": "Under interface config: `ip access-group <number|name> {in|out}`. (`access-class` is for VTY lines.)"},
+    {"id": "d34-q06", "type": "single", "q": "Where should a standard ACL be applied?", "options": ["As close to the source as possible", "As close to the destination as possible", "Always on the inbound direction of the WAN interface", "On every interface in the path"], "answer": [1], "explain": "Standard ACLs only know the source, so placing them near the destination avoids blocking the source from other, allowed destinations."},
+    {"id": "d34-q07", "type": "multi", "q": "Which TWO entries deny **only** host 10.1.1.1? (Choose two.)", "options": ["`access-list 1 deny 10.1.1.1 0.0.0.0`", "`access-list 1 deny 10.1.1.1 255.255.255.255`", "`access-list 1 deny host 10.1.1.1`", "`access-list 1 deny 10.1.1.0 0.0.0.255`", "`access-list 1 deny any 10.1.1.1`"], "answer": [0, 2], "explain": "Wildcard 0.0.0.0 or the `host` keyword match exactly one address. Wildcard 255.255.255.255 matches everything."},
+    {"id": "d34-q08", "type": "single", "q": "What is the wildcard mask that matches all addresses in 172.16.32.0/20?", "options": ["0.0.15.255", "0.0.31.255", "255.255.240.0", "0.0.16.255"], "answer": [0], "explain": "/20 mask = 255.255.240.0 → wildcard = 255.255.255.255 − 255.255.240.0 = **0.0.15.255**."},
+    {"id": "d34-q09", "type": "single", "q": "Which prompt do you see after `ip access-list standard BLOCK_BOB`?", "options": ["`R1(config-acl)#`", "`R1(config-std-nacl)#`", "`R1(config-if)#`", "`R1(config-ext-nacl)#`"], "answer": [1], "explain": "Standard named ACLs use `config-std-nacl`; extended named ACLs use `config-ext-nacl`."},
+    {"id": "d34-q10", "type": "single", "q": "An administrator creates ACL 1 in global configuration mode but traffic is not being filtered. What is the most likely reason?", "options": ["Standard ACLs require a name", "The ACL has not been applied to an interface", "The implicit permit allows all traffic", "ACLs only take effect after a reload"], "answer": [1], "explain": "An ACL does nothing until applied with `ip access-group` on an interface (in or out)."}
+  ]
+});
