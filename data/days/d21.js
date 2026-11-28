@@ -1,0 +1,29 @@
+CCNA.addDay("d21", {
+  "cards": [
+    {"id": "d21-c01", "front": "The four classic STP port states (plus disabled)?", "back": "**Blocking** (stable) → **Listening** (15 s) → **Learning** (15 s) → **Forwarding** (stable). Disabled = administratively shut down."},
+    {"id": "d21-c02", "front": "What happens in the **Listening** state?", "back": "BPDUs are sent and received; **no** MAC learning, **no** user frames. Only root and designated ports go through it."},
+    {"id": "d21-c03", "front": "What happens in the **Learning** state?", "back": "BPDUs are sent and received and **MAC addresses are learned**, but user frames are still not forwarded."},
+    {"id": "d21-c04", "front": "Classic STP timers?", "back": "**Hello 2 s** · **Forward delay 15 s** (spent in listening, and again in learning) · **Max age 20 s** (10 hellos)"},
+    {"id": "d21-c05", "front": "Worst-case convergence for a blocked port that must start forwarding?", "back": "Max age 20 + listening 15 + learning 15 = **50 seconds**."},
+    {"id": "d21-c06", "front": "Can a blocking port go straight to forwarding?", "back": "**No**, it must pass through listening and learning. A forwarding port can go straight to blocking."},
+    {"id": "d21-c07", "front": "Whose timers does the whole STP domain use?", "back": "The **root bridge's**."},
+    {"id": "d21-c08", "front": "BPDU destination MACs?", "back": "IEEE STP: **0180.c200.0000**. Cisco PVST+: **0100.0ccc.cccd**."},
+    {"id": "d21-c09", "front": "PVST vs PVST+?", "back": "Both run one STP instance per VLAN. PVST supports only ISL trunks; **PVST+** supports **802.1Q**."},
+    {"id": "d21-c10", "front": "What does **PortFast** do, and where do you use it?", "back": "The port goes **straight to forwarding**. Use it only on access ports to **end hosts**. `spanning-tree portfast` (interface) or `spanning-tree portfast default` (global, access ports)."},
+    {"id": "d21-c11", "front": "What does **BPDU Guard** do?", "back": "**Err-disables** the port as soon as it receives a BPDU. `spanning-tree bpduguard enable` (interface) or `spanning-tree portfast bpduguard default` (global, PortFast ports)."},
+    {"id": "d21-c12", "front": "`spanning-tree vlan 1 root primary` and `root secondary` set which priorities?", "back": "Primary: **24576**, or 4096 below the current root if that's lower. Secondary: **28672**."},
+    {"id": "d21-c13", "front": "Per-port STP tuning commands?", "back": "`spanning-tree vlan <id> cost <n>` and `spanning-tree vlan <id> port-priority <0–240, steps of 16>` (interface config)."}
+  ],
+  "questions": [
+    {"id": "d21-q01", "type": "single", "q": "In which classic STP state does a port learn MAC addresses but still not forward user frames?", "options": ["Blocking", "Listening", "Learning", "Forwarding"], "answer": [2], "explain": "Learning comes after listening, which learns nothing."},
+    {"id": "d21-q02", "type": "single", "q": "How long does a port spend in the listening state by default?", "options": ["2 seconds", "15 seconds", "20 seconds", "50 seconds"], "answer": [1], "explain": "Forward delay = 15 s for listening, then another 15 s for learning."},
+    {"id": "d21-q03", "type": "single", "q": "A blocked port must become forwarding after the root port's indirect failure. Worst-case time with classic STP?", "options": ["15 s", "30 s", "50 s", "2 s"], "answer": [2], "explain": "Max age (20) + listening (15) + learning (15)."},
+    {"id": "d21-q04", "type": "single", "q": "Which statement about classic STP port transitions is true?", "options": ["A blocking port can move straight to forwarding", "A forwarding port can move straight to blocking", "Non-designated ports go through listening", "Learning comes before listening"], "answer": [1], "explain": "Blocking → forwarding must go through listening and learning; the reverse is immediate."},
+    {"id": "d21-q05", "type": "single", "q": "Which command enables PortFast on every access port of a switch?", "options": ["spanning-tree portfast", "spanning-tree portfast default", "spanning-tree mode portfast", "portfast all"], "answer": [1], "explain": "Global `spanning-tree portfast default` covers access ports, not trunks."},
+    {"id": "d21-q06", "type": "single", "q": "A PortFast port with BPDU Guard receives a BPDU. What happens?", "options": ["The BPDU is dropped and the port keeps forwarding", "The port becomes err-disabled", "The port becomes the root port", "PortFast is turned off on the port"], "answer": [1], "explain": "BPDU Guard shuts the port down to prevent a loop."},
+    {"id": "d21-q07", "type": "single", "q": "The current root's priority is 16384. What does `spanning-tree vlan 1 root primary` set on SW2?", "options": ["24576", "16384", "12288", "4096"], "answer": [2], "explain": "24576 wouldn't win, so IOS uses 4096 below the current root."},
+    {"id": "d21-q08", "type": "multi", "q": "Which two are default classic STP timer values? (Choose two.)", "options": ["Hello 2 seconds", "Forward delay 15 seconds", "Max age 10 seconds", "Hello 10 seconds", "Forward delay 30 seconds"], "answer": [0, 1], "explain": "Max age is 20 seconds."},
+    {"id": "d21-q09", "type": "single", "q": "Which switch's timers apply to the whole STP domain?", "options": ["Each switch uses its own", "The root bridge's", "The switch with the lowest MAC", "The switch with the most ports"], "answer": [1], "explain": "Timers are carried in the root's BPDUs."},
+    {"id": "d21-q10", "type": "multi", "q": "Which two port types should get PortFast? (Choose two.)", "options": ["An access port connected to a PC", "An access port connected to a server", "A trunk to another switch", "An uplink to the distribution switch", "A port in an EtherChannel to a switch"], "answer": [0, 1], "explain": "Never on ports that lead to other switches."}
+  ]
+});

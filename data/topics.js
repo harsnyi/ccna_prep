@@ -41,7 +41,7 @@ window.CCNA_TOPICS = [
    "lessons": ["d20", "d21", "d22"], "drills": [],
    "summary": "Root bridge election, port roles and states, path cost, timers, RSTP improvements and PortFast/BPDU Guard.",
    "focus": ["Bridge ID = priority (+ VLAN) + MAC; lowest wins", "Root port → designated port → blocked, tie-breakers", "Port costs (100M=19, 1G=4, 10G=2)", "STP states and timers vs RSTP discarding/learning/forwarding", "Alternate vs backup ports; PortFast, BPDU Guard"]},
-  {"id": "etherchannel", "title": "EtherChannel", "domain": "access", "blueprint": ["2.4"], "weight": "important", "guide": false,
+  {"id": "etherchannel", "title": "EtherChannel", "domain": "access", "blueprint": ["2.4"], "weight": "important", "guide": true,
    "lessons": ["d23"], "drills": [],
    "summary": "Bundling links with LACP, PAgP or static, member requirements, load balancing and L3 EtherChannel.",
    "focus": ["LACP active/passive, PAgP desirable/auto, mode on", "Which mode combinations form a channel", "Members must match speed, duplex, mode, VLANs", "port-channel load-balance methods", "no switchport for L3 EtherChannel"]},
