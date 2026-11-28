@@ -48,6 +48,126 @@
     };
   };
 
+
+  // ---------- exam plan ----------
+  const examPlan = () => {
+    const man = CCNA.manifest();
+    const today = CCNA.today();
+    const exam = S.settings.examDate || CCNA.EXAM.lastDay;
+    const daysLeft = CCNA.daysBetween(today, exam);
+    const reviewDays = Math.max(0, Math.min(S.settings.reviewDays, Math.max(0, daysLeft - 1)));
+    const learnEnd = CCNA.addDays(exam, -reviewDays);
+    const learnDaysLeft = Math.max(0, CCNA.daysBetween(today, learnEnd));
+    const doneN = man.filter((m) => S.done[m.id]).length;
+    const left = man.length - doneN;
+    const doneToday = man.filter((m) => S.done[m.id] === today).length;
+    // Lessons needed per day, counting today (and crediting lessons already finished today).
+    const perDay = left === 0 ? 0 : learnDaysLeft > 0 ? (left + doneToday) / (learnDaysLeft + 1) : left + doneToday;
+    const todayTarget = Math.ceil(perDay);
+    const weekAgo = CCNA.addDays(today, -6);
+    const dated = Object.values(S.done).filter((v) => typeof v === "string");
+    const last7 = dated.filter((v) => v >= weekAgo).length;
+    // Average over the last 7 days, or fewer if tracking started more recently (so day one isn't "behind").
+    const first = dated.length ? dated.reduce((a, b) => (a < b ? a : b)) : today;
+    const window = Math.max(1, Math.min(7, CCNA.daysBetween(first, today) + 1));
+    const pace7 = last7 / window;
+    const projected = pace7 > 0 && left > 0 ? CCNA.addDays(today, Math.ceil(left / pace7)) : null;
+    let status;
+    if (left === 0) status = { cls: "ok", text: "All lessons done — review phase" };
+    else if (daysLeft < 0) status = { cls: "bad", text: "Exam date has passed" };
+    else if (!dated.length) status = { cls: "", text: "Not started — tick off lessons to measure pace" };
+    else if (projected && projected <= learnEnd) status = { cls: "ok", text: "On track" };
+    else if (projected && projected <= exam) status = { cls: "warn", text: "Tight — would eat into review time" };
+    else status = { cls: "bad", text: "Behind — pick up the pace" };
+
+    // Readiness (rough estimate): coverage weighted like the exam, card retention, recent mock scores.
+    const coverage = Object.entries(DOMAINS).reduce((sum, [k, d]) => { const x = domainStats(k); return sum + d.weight * (x.notes ? x.done / x.notes : 0); }, 0);
+    const cards = CCNA.allCards();
+    const learned = cards.filter((c) => !SRS.isNew(c.id)).length;
+    const retention = cards.length ? learned / cards.length : 0;
+    const recent = S.mocks.slice(-3);
+    const mockAvg = recent.length ? recent.reduce((a, x) => a + x.correct / x.total, 0) / recent.length : 0;
+    const readiness = Math.round(100 * (0.4 * coverage + 0.2 * retention + 0.4 * mockAvg));
+
+    const coreTopics = CCNA.topics().filter((t) => t.weight === "core");
+    const coreDone = coreTopics.filter((t) => { const g = CCNA.guideStats(t.id); return g.sections && g.understood === g.sections; }).length;
+    const sub = S.drills.subnet;
+    const milestones = [
+      { ok: left === 0, text: `Finish all ${man.length} lessons`, sub: `${doneN}/${man.length}` },
+      { ok: cards.length > 0 && learned === cards.length, text: "Learn every flashcard", sub: `${learned}/${cards.length}` },
+      { ok: coreTopics.length > 0 && coreDone === coreTopics.length, text: "Work through every core-topic guide", sub: `${coreDone}/${coreTopics.length} topics` },
+      { ok: !!sub && sub.attempts >= 50 && sub.correct / sub.attempts >= 0.9, text: "Subnetting drill ≥ 90% over 50+ tries", sub: sub ? `${pct(sub.correct, sub.attempts)}% of ${sub.attempts}` : "not started" },
+      { ok: S.mocks.some((x) => x.total >= 50 && x.correct / x.total >= 0.85), text: "Score 85%+ on a 50+ question mock", sub: S.mocks.length ? `best ${Math.max(...S.mocks.map((x) => pct(x.correct, x.total)))}%` : "no mocks yet" },
+      { ok: recent.length === 3 && recent.every((x) => x.correct / x.total >= 0.85), text: "Last 3 mocks all 85%+", sub: recent.length ? recent.map((x) => pct(x.correct, x.total) + "%").join(" · ") : "—" },
+    ];
+
+    // Streak: consecutive days with any activity, ending today (or yesterday if today is still empty).
+    const active = (d) => { const a = S.activity[d]; return !!a && Object.values(a).some((n) => n > 0); };
+    let streak = 0, d = active(today) ? today : CCNA.addDays(today, -1);
+    while (active(d)) { streak++; d = CCNA.addDays(d, -1); }
+
+    return { exam, isDefault: !S.settings.examDate, daysLeft, reviewDays, learnEnd, learnDaysLeft, doneN, left, total: man.length, doneToday, perDay, todayTarget, last7, projected, status, coverage, retention, mockAvg, readiness, milestones, streak, active };
+  };
+
+  function examPanel(p) {
+    const today = CCNA.today();
+    const late = S.settings.examDate && S.settings.examDate > CCNA.EXAM.lastDay;
+    const heat = Array.from({ length: 28 }, (_, k) => {
+      const day = CCNA.addDays(today, k - 27), a = S.activity[day] || {};
+      const n = (a.cards || 0) + (a.questions || 0) + (a.drills || 0) + 5 * (a.lessons || 0) + 3 * (a.reading || 0);
+      const lvl = n === 0 ? 0 : n < 15 ? 1 : n < 40 ? 2 : 3;
+      return `<i class="h${lvl}${day === today ? " today" : ""}${day === p.exam ? " exam" : ""}" title="${CCNA.fmtDate(day)}: ${n ? `${a.lessons || 0} lessons, ${a.reading || 0} guide sections, ${a.cards || 0} cards, ${a.questions || 0} questions, ${a.drills || 0} drills` : "no study"}"></i>`;
+    }).join("");
+    const ring = (v, label) => `<div class="ring" style="--v:${Math.round(v * 100)}"><b>${Math.round(v * 100)}%</b><span>${label}</span></div>`;
+    const learnPct = p.total ? pct(p.doneN, p.total) : 0;
+    return `<section class="panel exam">
+      <div class="exam-head">
+        <div class="countdown ${p.daysLeft <= 14 ? "soon" : ""}">
+          <b>${p.daysLeft >= 0 ? p.daysLeft : "—"}</b><span>day${p.daysLeft === 1 ? "" : "s"} to exam</span>
+        </div>
+        <div class="exam-when">
+          <div class="muted small">${CCNA.EXAM.name}${p.isDefault ? " · last possible test date" : ""}</div>
+          <div class="exam-date">${CCNA.fmtDate(p.exam)}</div>
+          <label class="inline small">Exam date <input type="date" id="exam-date" value="${S.settings.examDate || ""}" max="${CCNA.EXAM.lastDay}" min="${today}"></label>
+          ${p.isDefault ? `<p class="muted small">No date booked yet — planning against the v1.1 cutoff. Set your date when you book.</p>` : ""}
+          ${late ? `<p class="bad-text small">That's after ${CCNA.fmtDate(CCNA.EXAM.lastDay)} — you'd be sitting ${CCNA.EXAM.nextVersion}, not v1.1.</p>` : ""}
+        </div>
+        <div class="readiness" title="Rough estimate: 40% lessons covered (exam-weighted) + 20% flashcards learned + 40% average of last 3 mocks">
+          <b>${p.readiness}%</b><span>readiness</span>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="tl-bar"><i class="tl-learn" style="width:${learnPct}%"></i></div>
+        <div class="tl-legend muted small">
+          <span>Lessons ${p.doneN}/${p.total}</span>
+          <span>Learning ends <b>${CCNA.fmtDate(p.learnEnd, { month: "short", day: "numeric" })}</b> (${p.learnDaysLeft} days) → ${p.reviewDays}-day review &amp; mocks → exam</span>
+        </div>
+      </div>
+
+      <div class="exam-grid">
+        <div>
+          <h3>Pace</h3>
+          <div class="status ${p.status.cls}">${p.status.text}</div>
+          <ul class="facts">
+            <li><b>${p.left ? p.perDay.toFixed(1) : 0}</b> lessons/day needed <span class="muted">(${p.left ? (p.perDay * 7).toFixed(0) : 0}/week)</span></li>
+            <li><b>${p.last7}</b> lessons done in the last 7 days</li>
+            <li>Today: <b>${p.doneToday}/${p.left || p.doneToday ? p.todayTarget : 0}</b> lessons${p.doneToday >= p.todayTarget && p.left ? ' <span class="ok-text">✓ target met</span>' : ""}</li>
+            ${p.projected ? `<li>At this pace you finish lessons on <b>${CCNA.fmtDate(p.projected, { month: "short", day: "numeric" })}</b></li>` : ""}
+          </ul>
+          <div class="rings">${ring(p.coverage, "covered")}${ring(p.retention, "cards learned")}${ring(p.mockAvg, "mock avg")}</div>
+        </div>
+        <div>
+          <h3>Milestones before exam day</h3>
+          <ul class="milestones">${p.milestones.map((m) => `<li class="${m.ok ? "ok" : ""}"><span class="check">${m.ok ? "✓" : ""}</span>${m.text}<small class="muted">${m.sub}</small></li>`).join("")}</ul>
+          <h3>Study streak: ${p.streak} day${p.streak === 1 ? "" : "s"}</h3>
+          <div class="heat">${heat}</div>
+          <div class="muted small">Last 4 weeks</div>
+        </div>
+      </div>
+    </section>`;
+  }
+
   // ---------- dashboard ----------
   function dashboard() {
     const man = CCNA.manifest();
@@ -57,8 +177,10 @@
     const doneN = man.filter((m) => S.done[m.id]).length;
     const bestMock = S.mocks.length ? Math.max(...S.mocks.map((x) => pct(x.correct, x.total))) : null;
 
+    const plan = examPlan();
     // Study-today suggestions
     const todo = [];
+    if (plan.left && plan.doneToday < plan.todayTarget) todo.push(`<a class="todo plan" href="#/"><b>Exam plan: ${plan.todayTarget - plan.doneToday} more lesson${plan.todayTarget - plan.doneToday === 1 ? "" : "s"} today</b><span>${plan.left} left · ${plan.daysLeft} days to exam — ticking off lessons below keeps you on track.</span></a>`);
     if (due + newAvail > 0) todo.push(`<a class="todo" href="#/cards"><b>${[due ? `Review ${due} due card${due === 1 ? "" : "s"}` : "", newAvail ? `${due ? "+" : "Learn"} ${newAvail} new card${newAvail === 1 ? "" : "s"}` : ""].filter(Boolean).join(" ")}</b><span>Spaced repetition — do this first, every day.</span></a>`);
     const weak = Object.keys(DOMAINS).map((k) => ({ k, ...domainStats(k) })).filter((d) => d.acc !== null && d.right + d.wrong >= 5).sort((a, b) => a.acc - b.acc)[0];
     if (weak && weak.acc < 85) {
@@ -69,6 +191,8 @@
     if (unquizzed) todo.push(`<a class="todo" href="#/quiz/${unquizzed.id}"><b>Quiz yourself on ${dayLabel(unquizzed)}</b><span>${esc(unquizzed.title)} — marked done but not quizzed yet.</span></a>`);
     const drillWeak = Object.entries(CCNA.DRILLS).map(([k, d]) => ({ k, d, s: S.drills[k] })).sort((a, b) => (a.s ? a.s.correct / a.s.attempts : -1) - (b.s ? b.s.correct / b.s.attempts : -1))[0];
     if (drillWeak) todo.push(`<a class="todo" href="#/drills/${drillWeak.k}"><b>5-minute drill: ${drillWeak.d.name}</b><span>${drillWeak.s ? `${pct(drillWeak.s.correct, drillWeak.s.attempts)}% accuracy so far` : "Not attempted yet"}.</span></a>`);
+    const ng = nextGuideSection();
+    if (ng) todo.push(`<a class="todo" href="#/topics/${ng.t.id}"><b>Study guide: ${esc(ng.t.title)}</b><span>Next up: ${ng.k + 1}. ${esc(ng.sec.title)}</span></a>`);
     const next = man.find((m) => !S.done[m.id]);
     if (next) todo.push(`<a class="todo" href="${CCNA.NOTES_GITHUB}${next.file}" target="_blank" rel="noopener"><b>Next lesson: ${dayLabel(next)} — ${esc(next.title)}</b><span>Read the notes / watch the video, then tick it off below.</span></a>`);
 
@@ -105,6 +229,7 @@
     }).join("");
 
     setView(`
+      ${examPanel(plan)}
       <section class="stats">
         <div class="stat"><b>${due}</b><span>cards due</span></div>
         <div class="stat"><b>${doneN}<small>/${man.length}</small></b><span>lessons done</span></div>
@@ -126,10 +251,12 @@
     $main().querySelectorAll("[data-done]").forEach((cb) =>
       cb.addEventListener("change", () => {
         const id = cb.dataset.done;
-        cb.checked ? (S.done[id] = true) : delete S.done[id];
+        if (cb.checked) { S.done[id] = CCNA.today(); CCNA.logActivity("lessons"); } else delete S.done[id];
         CCNA.save();
         dashboard();
       }));
+    const ed = document.getElementById("exam-date");
+    ed.onchange = () => { S.settings.examDate = ed.value || null; CCNA.save(); dashboard(); };
   }
 
   // ---------- flashcards ----------
@@ -413,6 +540,7 @@
       fb.all = all;
       const st = (S.drills[cur.k] = S.drills[cur.k] || { attempts: 0, correct: 0, streak: 0, bestStreak: 0, bestMs: null });
       st.attempts++; sessionTotal++;
+      CCNA.logActivity("drills");
       if (all) {
         st.correct++; st.streak++; sessionRight++;
         st.bestStreak = Math.max(st.bestStreak, st.streak);
@@ -424,6 +552,114 @@
     newRound();
   }
 
+
+  // ---------- topics & study guides ----------
+  const weightPill = (w) => `<span class="pill w-${w}" title="${CCNA.WEIGHTS[w].blurb}">${CCNA.WEIGHTS[w].name}</span>`;
+  const lessonLinks = (t) => t.lessons.map((id) => CCNA.entry(id)).filter(Boolean);
+
+  function topicList() {
+    const groups = Object.entries(DOMAINS).map(([k, d]) => {
+      const ts = CCNA.topics().filter((t) => t.domain === k);
+      if (!ts.length) return "";
+      const cardsHtml = ts.map((t) => {
+        const g = CCNA.guideStats(t.id);
+        const ls = lessonLinks(t);
+        const lDone = ls.filter((m) => S.done[m.id]).length;
+        return `<a class="topic-card" href="#/topics/${t.id}">
+          <div class="row between"><b>${CCNA.guides[t.id] ? '<span class="guide-tick" title="Study guide written">✓</span>' : ""}${esc(t.title)}</b>${weightPill(t.weight)}</div>
+          <span class="muted small">${esc(t.summary)}</span>
+          <div class="bar"><i style="width:${pct(g.understood, g.sections)}%;background:${d.color}"></i></div>
+          <span class="small muted">${t.guide && CCNA.guides[t.id] ? `Guide: ${g.understood}/${g.sections} sections` : "Guide not written yet"} · Lessons ${lDone}/${ls.length} · ${t.blueprint.join(", ")}</span>
+        </a>`;
+      }).join("");
+      return `<h3><span class="dot" style="background:${d.color}"></span> ${d.name} <small class="muted">${Math.round(d.weight * 100)}%</small></h3><div class="topic-grid">${cardsHtml}</div>`;
+    }).join("");
+    const ready = CCNA.topics().filter((t) => CCNA.guides[t.id]).length;
+    setView(`<section class="panel"><h2>Key exam topics</h2>
+      <p class="muted"><span class="guide-tick">✓</span> = study guide written. The exam blueprint grouped into the topics that matter, independent of the course-day order. Each topic links its lessons and drills; topics with a study guide have in-depth material written for this app (${ready}/${CCNA.topics().length} so far).</p>
+      ${groups}</section>`);
+  }
+
+  function topicPage(id) {
+    const t = CCNA.topic(id);
+    if (!t) return topicList();
+    const d = DOMAINS[t.domain];
+    const g = CCNA.guides[id];
+    const prog = CCNA.guideProgress(id);
+    const ls = lessonLinks(t);
+
+    const practice = `<section class="panel" id="practice"><h2>Practice</h2>
+      ${t.drills.length ? `<h3>Drills</h3><div class="row">${t.drills.map((k) => `<a class="btn" href="#/drills/${k}">${CCNA.DRILLS[k].name}</a>`).join(" ")}</div>` : ""}
+      <h3>Related course lessons</h3>
+      <table class="days"><tbody>${ls.map((m) => {
+        const built = !!CCNA.days[m.id];
+        return `<tr class="${S.done[m.id] ? "is-done" : ""}"><td class="nowrap">${S.done[m.id] ? "✓" : ""}</td><td class="nowrap">${dayLabel(m)}</td><td>${esc(m.title)} <small>${noteLinks(m)}</small></td>
+          <td class="right nowrap">${built ? `<a class="btn sm" href="#/cards/${m.id}">Cards</a> <a class="btn sm" href="#/quiz/${m.id}">Quiz${S.quizBest[m.id] !== undefined ? ` ${S.quizBest[m.id]}%` : ""}</a>` : '<span class="pill">no quiz yet</span>'}</td></tr>`;
+      }).join("")}</tbody></table></section>`;
+
+    const header = `<section class="panel topic-head">
+      <div class="muted small"><a href="#/topics">Topics</a> / <span class="dot" style="background:${d.color}"></span> ${d.name} · blueprint ${t.blueprint.join(", ")}</div>
+      <h1>${esc(t.title)} ${weightPill(t.weight)}</h1>
+      <p>${esc(t.summary)}</p>
+      <div class="callout key"><div class="callout-title">What the exam expects</div><ul>${t.focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></div>
+      ${g ? `<div class="bar"><i id="g-bar" style="width:0%;background:${d.color}"></i></div><div class="muted small" id="g-count"></div>` : ""}
+    </section>`;
+
+    if (!g) {
+      setView(`${header}<section class="panel"><p class="muted">No in-app study guide for this topic yet — use the course lessons below for now.</p></section>${practice}`);
+      return;
+    }
+
+    const toc = g.sections.map((sec, k) => `<li data-toc="${sec.id}"><button type="button" data-goto="${sec.id}"><span class="check"></span>${k + 1}. ${esc(sec.title)}</button></li>`).join("");
+    const body = g.sections.map((sec, k) => `<article class="guide-sec" id="sec-${sec.id}">
+        <h2>${k + 1}. ${esc(sec.title)}</h2>
+        <div class="md-body">${CCNA.md(sec.md)}</div>
+        ${sec.checks && sec.checks.length ? `<div class="checks"><h4>Check yourself</h4>${sec.checks.map((c) => `<details><summary>${fmt(c.q)}</summary><div>${fmt(c.a)}</div></details>`).join("")}</div>` : ""}
+        <div class="row end"><button class="btn" data-understood="${sec.id}"></button></div>
+      </article>`).join("");
+
+    setView(`${header}
+      <div class="guide">
+        <nav class="guide-toc panel"><b>Contents</b><ol>${toc}</ol><button type="button" class="btn sm" data-goto="practice">Practice ↓</button></nav>
+        <div class="guide-body">${g.intro ? `<section class="panel md-body">${CCNA.md(g.intro)}</section>` : ""}<section class="panel">${body}</section>${practice}</div>
+      </div>`);
+
+    const refresh = () => {
+      const st = CCNA.guideStats(id);
+      document.getElementById("g-bar").style.width = pct(st.understood, st.sections) + "%";
+      document.getElementById("g-count").textContent = `${st.understood}/${st.sections} sections understood`;
+      g.sections.forEach((sec) => {
+        const on = !!prog[sec.id];
+        $main().querySelector(`[data-toc="${sec.id}"]`).classList.toggle("ok", on);
+        const b = $main().querySelector(`[data-understood="${sec.id}"]`);
+        b.textContent = on ? "✓ Understood — click to undo" : "Mark as understood";
+        b.classList.toggle("primary", !on);
+      });
+    };
+    $main().querySelectorAll("[data-goto]").forEach((b) => (b.onclick = () => {
+      const el = document.getElementById(b.dataset.goto === "practice" ? "practice" : `sec-${b.dataset.goto}`);
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+    $main().querySelectorAll("[data-understood]").forEach((b) => (b.onclick = () => {
+      const sid = b.dataset.understood;
+      if (prog[sid]) delete prog[sid];
+      else { prog[sid] = CCNA.today(); CCNA.logActivity("reading"); }
+      CCNA.save(); refresh();
+    }));
+    refresh();
+  }
+
+  /** Next unread section across written guides, core topics first. */
+  const nextGuideSection = () => {
+    const order = { core: 0, important: 1, know: 2 };
+    for (const t of CCNA.topics().filter((x) => CCNA.guides[x.id]).sort((a, b) => order[a.weight] - order[b.weight])) {
+      const p = S.guides[t.id] || {};
+      const sec = CCNA.guides[t.id].sections.find((x) => !p[x.id]);
+      if (sec) return { t, sec, k: CCNA.guides[t.id].sections.indexOf(sec) };
+    }
+    return null;
+  };
+
   // ---------- data / settings ----------
   function data() {
     setView(`<section class="panel">
@@ -432,6 +668,10 @@
       <div class="row"><button class="btn" id="exp">Export progress (JSON)</button>
         <label class="btn">Import progress<input type="file" id="imp" accept="application/json" hidden></label>
         <button class="btn danger" id="reset">Reset all progress</button></div>
+      <h3>Exam plan</h3>
+      <label class="inline">Exam date <input type="date" id="sdate" value="${S.settings.examDate || ""}" max="${CCNA.EXAM.lastDay}" style="width:auto"></label>
+      <label class="inline">Review buffer (days) <input type="number" id="srev" min="0" max="60" value="${S.settings.reviewDays}"></label>
+      <p class="muted small">Leave the date empty to plan against the last ${CCNA.EXAM.name} test date (${CCNA.fmtDate(CCNA.EXAM.lastDay)}). The review buffer is the time before the exam kept free for mocks and weak spots — new lessons should be finished before it starts.</p>
       <h3>Flashcard settings</h3>
       <label class="inline">New cards per day <input type="number" id="npd" min="0" max="500" value="${S.settings.newPerDay}"></label>
       <p class="muted small">Studying a single day's cards ignores this limit.</p>
@@ -450,6 +690,8 @@
       if (reset.dataset.armed) return CCNA.resetState();
       reset.dataset.armed = "1"; reset.textContent = "Click again to confirm reset";
     };
+    document.getElementById("sdate").onchange = (e) => { S.settings.examDate = e.target.value || null; CCNA.save(); };
+    document.getElementById("srev").onchange = (e) => { S.settings.reviewDays = Math.max(0, Math.min(60, +e.target.value || 0)); CCNA.save(); };
     document.getElementById("npd").onchange = (e) => { S.settings.newPerDay = Math.max(0, +e.target.value || 0); CCNA.save(); };
   }
 
@@ -465,7 +707,7 @@
     if (cleanup) { cleanup(); cleanup = null; }
     const [, view, arg] = (location.hash || "#/").split("/");
     document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === `#/${view || ""}`));
-    ({ "": dashboard, cards: () => cards(arg), quiz: () => quiz(arg), mock, drills: () => (arg ? drill(arg) : drillList()), data }[view || ""] || dashboard)();
+    ({ "": dashboard, topics: () => (arg ? topicPage(arg) : topicList()), cards: () => cards(arg), quiz: () => quiz(arg), mock, drills: () => (arg ? drill(arg) : drillList()), data }[view || ""] || dashboard)();
     const due = SRS.dueCount();
     document.getElementById("due-badge").textContent = due ? due : "";
   }
@@ -473,7 +715,8 @@
   // Load content for built days, then start.
   function boot() {
     const built = CCNA.manifest().filter((m) => m.built);
-    let pending = built.length;
+    const guides = CCNA.topics().filter((t) => t.guide);
+    let pending = built.length + guides.length;
     const missing = [];
     const done = () => {
       if (missing.length) document.getElementById("warn").innerHTML = `Content file missing for: ${missing.join(", ")} — run <code>python3 tools/status.py</code>.`;
@@ -486,6 +729,13 @@
       s.src = `data/days/${m.id}.js`;
       s.onload = () => { if (!CCNA.days[m.id]) missing.push(m.id); if (--pending === 0) done(); };
       s.onerror = () => { missing.push(m.id); if (--pending === 0) done(); };
+      document.body.appendChild(s);
+    });
+    guides.forEach((t) => {
+      const s = document.createElement("script");
+      s.src = `data/guides/${t.id}.js`;
+      s.onload = () => { if (!CCNA.guides[t.id]) missing.push(`guide ${t.id}`); if (--pending === 0) done(); };
+      s.onerror = () => { missing.push(`guide ${t.id}`); if (--pending === 0) done(); };
       document.body.appendChild(s);
     });
   }

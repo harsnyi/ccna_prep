@@ -2,7 +2,8 @@
 """Content build tracker.
 
 Validates data/manifest.js against data/days/*.js and prints which course days
-have practice content (flashcards + quiz questions).
+have practice content (flashcards + quiz questions), plus which key topics
+(data/topics.js) have an in-app study guide (data/guides/<id>.js).
 
     python3 tools/status.py            # table of all days
     python3 tools/status.py --todo     # only days not built yet
@@ -70,6 +71,45 @@ def main():
             problems.append(f"orphan content file not in manifest: {f.name}")
 
     print(f"\nBuilt {built_n}/{len(manifest)} lessons · {cards_n} flashcards · {qs_n} questions")
+
+    # ---- key topics / study guides ----
+    topics = js_payload(ROOT / "data" / "topics.js", "= [", "]")
+    drills = set(re.findall(r"^  D\.(\w+) = ", (ROOT / "js" / "drills.js").read_text(encoding="utf-8"), re.M))
+    tids, guides_n = set(), 0
+    print(f"\n{'Topic':18} {'Weight':9} {'Guide':6} {'Sections':>8}  Title")
+    for t in topics:
+        tids.add(t["id"])
+        g = ROOT / "data" / "guides" / f"{t['id']}.js"
+        for lid in t["lessons"]:
+            if lid not in ids:
+                problems.append(f"topic {t['id']}: unknown lesson {lid}")
+        for d in t["drills"]:
+            if d not in drills:
+                problems.append(f"topic {t['id']}: unknown drill {d}")
+        if t["weight"] not in ("core", "important", "know"):
+            problems.append(f"topic {t['id']}: bad weight {t['weight']}")
+        if t["guide"] != g.exists():
+            problems.append(f"topic {t['id']}: guide={t['guide']} but file exists={g.exists()}")
+        n_sec = ""
+        if g.exists():
+            guides_n += 1
+            text = g.read_text(encoding="utf-8")
+            m = re.search(r'CCNA\.addGuide\("([^"]+)"', text)
+            if not m or m.group(1) != t["id"]:
+                problems.append(f"guide {g.name}: addGuide id mismatch")
+            sec_ids = re.findall(r'^\s{4}\s*id: "([^"]+)",', text, re.M)
+            n_sec = len(sec_ids)
+            if len(set(sec_ids)) != len(sec_ids):
+                problems.append(f"guide {g.name}: duplicate section ids")
+            if "${" in text:
+                problems.append(f"guide {g.name}: contains '${{' (template interpolation)")
+        if only_todo and g.exists():
+            continue
+        print(f"{t['id']:18} {t['weight']:9} {'yes' if g.exists() else '-':6} {n_sec:>8}  {t['title']}")
+    for f in (ROOT / "data" / "guides").glob("*.js"):
+        if f.stem not in tids:
+            problems.append(f"orphan guide file not in topics: {f.name}")
+    print(f"\nStudy guides written: {guides_n}/{len(topics)} topics")
     if problems:
         print("\nPROBLEMS:")
         for p in problems:

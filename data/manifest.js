@@ -5,13 +5,13 @@
  * Domains follow the CCNA 200-301 blueprint (see DOMAINS in js/store.js).
  */
 window.CCNA_MANIFEST = [
-  {"id": "d01", "day": 1, "title": "Network Devices", "file": "Network_Devices.md", "domain": "fund", "built": false},
-  {"id": "d02", "day": 2, "title": "Interfaces and Cables", "file": "Interfaces_and_Cables.md", "domain": "fund", "built": false},
+  {"id": "d01", "day": 1, "title": "Network Devices", "file": "Network_Devices.md", "domain": "fund", "built": true},
+  {"id": "d02", "day": 2, "title": "Interfaces and Cables", "file": "Interfaces_and_Cables.md", "domain": "fund", "built": true},
   {"id": "d03", "day": 3, "title": "OSI Model & TCP/IP Suite", "file": "OSI_Model_TCPSuite.md", "domain": "fund", "built": true},
-  {"id": "d04", "day": 4, "title": "Intro to the CLI", "file": "Intro_to_CLI.md", "domain": "fund", "built": false},
-  {"id": "d05", "day": 5, "title": "Ethernet LAN Switching pt.1", "file": "Ethernet_LAN_Switching_Part1.md", "domain": "access", "built": false},
-  {"id": "d06", "day": 6, "title": "Ethernet LAN Switching pt.2", "file": "Ethernet_LAN_Switching_Part2.md", "domain": "access", "built": false},
-  {"id": "d07", "day": 7, "title": "IPv4 Addressing pt.1", "file": "IPv4_Addressing_Part1.md", "domain": "fund", "built": false},
+  {"id": "d04", "day": 4, "title": "Intro to the CLI", "file": "Intro_to_CLI.md", "domain": "fund", "built": true},
+  {"id": "d05", "day": 5, "title": "Ethernet LAN Switching pt.1", "file": "Ethernet_LAN_Switching_Part1.md", "domain": "access", "built": true},
+  {"id": "d06", "day": 6, "title": "Ethernet LAN Switching pt.2", "file": "Ethernet_LAN_Switching_Part2.md", "domain": "access", "built": true},
+  {"id": "d07", "day": 7, "title": "IPv4 Addressing pt.1", "file": "IPv4_Addressing_Part1.md", "domain": "fund", "built": true},
   {"id": "d08", "day": 8, "title": "IPv4 Addressing pt.2", "file": "IPv4_Addressing_Part2.md", "domain": "fund", "built": false},
   {"id": "d09", "day": 9, "title": "Switch Interfaces", "file": "Switch_Interfaces.md", "domain": "access", "built": false},
   {"id": "d10", "day": 10, "title": "The IPv4 Header", "file": "The_IPv4_Header.md", "domain": "fund", "built": false},

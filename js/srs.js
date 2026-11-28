@@ -63,6 +63,7 @@
   SRS.grade = (id, grade) => {
     const wasNew = SRS.isNew(id);
     CCNA.state.srs[id] = SRS.schedule(CCNA.state.srs[id], grade);
+    CCNA.logActivity("cards");
     if (wasNew) { const t = CCNA.today(); CCNA.state.newLog[t] = (CCNA.state.newLog[t] || 0) + 1; }
     CCNA.save();
     return CCNA.state.srs[id];
