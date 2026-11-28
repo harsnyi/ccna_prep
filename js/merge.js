@@ -7,6 +7,7 @@
  *   quizBest   per day: max
  *   drills     per drill: more attempts wins
  *   mocks      union of attempts
+ *   review     per question: the most recent update wins (field "t")
  *   newLog     per date: max
  *   activity   per date and kind: max
  * Things that can be switched off again carry a timestamp in `stamps` (ms), and the newer change wins:
@@ -77,6 +78,7 @@
     out.srs = pickBy(obj(a.srs), obj(b.srs), (s) => (s.reps || 0) * 1e13 + (s.due || 0));
     out.answers = pickBy(obj(a.answers), obj(b.answers), (x) => (x.right || 0) + (x.wrong || 0));
     out.drills = pickBy(obj(a.drills), obj(b.drills), (x) => x.attempts || 0);
+    out.review = pickBy(obj(a.review), obj(b.review), (x) => x.t || 0); // newest update wins (graduated items stay as records)
 
     const qa = obj(a.quizBest), qb = obj(b.quizBest), quizBest = {};
     keys(qa, qb).forEach((k) => { quizBest[k] = Math.max(qa[k] ?? -1, qb[k] ?? -1); });

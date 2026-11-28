@@ -46,12 +46,19 @@
     activity: {},      // yyyy-mm-dd -> {cards, questions, drills, lessons, reading}
     guides: {},        // topicId -> {sectionId: "yyyy-mm-dd" marked understood}
     stamps: {},        // change times (ms) for things that can be switched off again — used by sync (js/merge.js)
+    review: {},        // questionId -> {t, due, streak, misses, graduated?} — mistakes review queue
     settings: { newPerDay: 20, examDate: null, reviewDays: 14 },
   });
   let state;
   const load = (obj) => { const b = blank(); const st = Object.assign(b, obj); st.settings = Object.assign(blank().settings, obj.settings); return st; };
   try { state = load(JSON.parse(localStorage.getItem(KEY) || "{}")); }
   catch (e) { state = blank(); }
+  // One-time start of the review queue: questions whose last answer was wrong (t: 0 so any real update wins in sync).
+  if (!Object.keys(state.review).length) {
+    Object.entries(state.answers).forEach(([qid, a]) => {
+      if (a.last === false) state.review[qid] = { t: 0, due: 0, streak: 0, misses: a.wrong || 1 };
+    });
+  }
   CCNA.state = state;
   CCNA.normalize = load;
   CCNA.saveLocal = () => localStorage.setItem(KEY, JSON.stringify(state));
@@ -73,12 +80,35 @@
     location.reload();
   };
 
-  CCNA.recordAnswer = (qid, correct) => {
+  CCNA.recordAnswer = (qid, correct, opts = {}) => {
     const a = (state.answers[qid] = state.answers[qid] || { right: 0, wrong: 0, last: null });
     correct ? a.right++ : a.wrong++;
     a.last = correct;
     CCNA.logActivity("questions");
+    if (!opts.timedOut) CCNA.reviewUpdate(qid, correct); // unanswered when a mock's time runs out isn't a "mistake"
   };
+
+  // ---- mistakes review queue ----
+  // Wrong answer → due now (streak 0). Correct while due → back tomorrow, then in 3 days; the 3rd correct in a row = mastered.
+  CCNA.REVIEW_STEPS = [1, 3];
+  CCNA.REVIEW_GOAL = CCNA.REVIEW_STEPS.length + 1;
+  const dayStart = (n) => CCNA.parseDate(CCNA.addDays(CCNA.today(), n)).getTime(); // local midnight, n days from today
+  CCNA.reviewUpdate = (qid, correct) => {
+    const now = Date.now(), r = state.review[qid];
+    if (!correct) {
+      state.review[qid] = { t: now, due: now, streak: 0, misses: ((r && r.misses) || 0) + 1 };
+      return;
+    }
+    if (!r || r.graduated || r.due > now) return; // not in the queue, or answered early: no change
+    const streak = r.streak + 1;
+    state.review[qid] = streak >= CCNA.REVIEW_GOAL
+      ? { t: now, due: null, streak, misses: r.misses, graduated: true }
+      : { t: now, due: dayStart(CCNA.REVIEW_STEPS[streak - 1]), streak, misses: r.misses };
+  };
+  const reviewIds = (pred) => Object.entries(state.review).filter(([, r]) => pred(r)).map(([id]) => id);
+  CCNA.reviewDue = () => reviewIds((r) => !r.graduated && r.due <= Date.now());
+  CCNA.reviewQueued = () => reviewIds((r) => !r.graduated);
+  CCNA.reviewMastered = () => reviewIds((r) => r.graduated);
   CCNA.logActivity = (kind, n = 1) => {
     const d = (state.activity[CCNA.today()] = state.activity[CCNA.today()] || {});
     d[kind] = (d[kind] || 0) + n;

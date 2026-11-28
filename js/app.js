@@ -181,6 +181,8 @@
     // Study-today suggestions
     const todo = [];
     if (plan.left && plan.doneToday < plan.todayTarget) todo.push(`<a class="todo plan" href="#/"><b>Exam plan: ${plan.todayTarget - plan.doneToday} more lesson${plan.todayTarget - plan.doneToday === 1 ? "" : "s"} today</b><span>${plan.left} left · ${plan.daysLeft} days to exam — ticking off lessons below keeps you on track.</span></a>`);
+    const rDue = dueReview().length;
+    if (rDue) todo.push(`<a class="todo" href="#/review"><b>Review ${rDue} missed question${rDue === 1 ? "" : "s"}</b><span>Mistakes come back until you get them right ${CCNA.REVIEW_GOAL} times in a row.</span></a>`);
     if (due + newAvail > 0) todo.push(`<a class="todo" href="#/cards"><b>${[due ? `Review ${due} due card${due === 1 ? "" : "s"}` : "", newAvail ? `${due ? "+" : "Learn"} ${newAvail} new card${newAvail === 1 ? "" : "s"}` : ""].filter(Boolean).join(" ")}</b><span>Spaced repetition — do this first, every day.</span></a>`);
     const weak = Object.keys(DOMAINS).map((k) => ({ k, ...domainStats(k) })).filter((d) => d.acc !== null && d.right + d.wrong >= 5).sort((a, b) => a.acc - b.acc)[0];
     if (weak && weak.acc < 85) {
@@ -381,7 +383,7 @@
       const el = document.getElementById("clock");
       if (el) { el.textContent = CCNA.fmtMs(Math.max(0, left)); el.className = left < 5 * 60000 ? "warn" : ""; }
       if (left <= 0) { // time's up: remaining questions count as wrong
-        for (; i < items.length; i++) { results.push({ item: items[i], chosen: new Set(), ok: false }); CCNA.recordAnswer(items[i].q.id, false); }
+        for (; i < items.length; i++) { results.push({ item: items[i], chosen: new Set(), ok: false }); CCNA.recordAnswer(items[i].q.id, false, { timedOut: true }); }
         CCNA.save(); finish();
       }
     };
@@ -425,6 +427,7 @@
           <h2>${title}</h2>
           <div class="score ${score >= 85 ? "ok-text" : score >= 70 ? "" : "bad-text"}">${score}%</div>
           <p class="center muted">${results.filter((r) => r.ok).length} / ${results.length} correct${prevBest !== undefined ? ` · previous best ${prevBest}%` : ""}</p>
+          ${missedNote(results)}
           <div class="row center"><button class="btn primary" id="retry">Retry</button> <a class="btn" href="#/cards/${scope}">Flashcards</a> <a class="btn" href="#/">Dashboard</a></div>
           ${reviewList(results)}</section>`);
         document.getElementById("retry").onclick = () => quiz(scope);
@@ -485,6 +488,7 @@
           <div class="score ${score >= 85 ? "ok-text" : score >= 70 ? "" : "bad-text"}">${score}%</div>
           <p class="center muted">${correct} / ${results.length} correct. Cisco doesn't publish a pass mark; aim for a consistent 85%+ on practice before booking.</p>
           ${domRows}
+          ${missedNote(results)}
           <div class="row center"><a class="btn primary" href="#/mock">New mock</a> <a class="btn" href="#/">Dashboard</a></div>
           ${reviewList(results)}</section>`);
       },
@@ -662,6 +666,92 @@
     return null;
   };
 
+
+  // ---------- mistakes review ----------
+  const qById = () => Object.fromEntries(CCNA.allQuestions().map((q) => [q.id, q]));
+  const dueReview = () => { const m = qById(); return CCNA.reviewDue().filter((id) => m[id]); };
+  const plainQ = (q) => q.q.replace(/```[\s\S]*?```/g, " [exhibit] ").replace(/[`*]/g, "").replace(/\s+/g, " ").trim();
+  const whenDue = (r) => {
+    if (r.due <= Date.now()) return '<span class="bad-text">due now</span>';
+    const d = CCNA.daysBetween(CCNA.today(), CCNA.dateStr(new Date(r.due)));
+    return d <= 1 ? "tomorrow" : `in ${d} days`;
+  };
+  const dots = (r) => Array.from({ length: CCNA.REVIEW_GOAL }, (_, k) => `<i class="${k < r.streak ? "on" : ""}"></i>`).join("");
+  const missedNote = (results) => {
+    const n = results.filter((r) => !r.ok && r.chosen.size).length;
+    return n ? `<p class="center muted">${n} missed question${n === 1 ? "" : "s"} added to your <a href="#/review">mistakes review</a> — ${n === 1 ? "it comes" : "they come"} back until you get ${n === 1 ? "it" : "them"} right ${CCNA.REVIEW_GOAL} times.</p>` : "";
+  };
+
+  function review() {
+    const m = qById();
+    const due = dueReview();
+    const queued = CCNA.reviewQueued().filter((id) => m[id]);
+    const mastered = CCNA.reviewMastered().length;
+    const rows = queued
+      .map((id) => ({ id, r: S.review[id], q: m[id] }))
+      .sort((a, b) => a.r.due - b.r.due || b.r.misses - a.r.misses)
+      .map(({ r, q }) => {
+        const cm = CCNA.entry(q.dayId);
+        const txt = plainQ(q);
+        return `<tr><td>${esc(txt.length > 110 ? txt.slice(0, 107) + "…" : txt)}</td>
+          <td class="nowrap"><a href="#/quiz/${q.dayId}">${dayLabel(cm)}</a></td>
+          <td class="nowrap center">${r.misses}×</td>
+          <td class="nowrap"><span class="dots" title="${r.streak}/${CCNA.REVIEW_GOAL} correct in a row">${dots(r)}</span></td>
+          <td class="nowrap">${whenDue(r)}</td></tr>`;
+      }).join("");
+    setView(`<section class="panel">
+      <h2>Mistakes review</h2>
+      <p class="muted">Every question you get wrong — in a quiz, mock or here — comes back until you answer it right
+        <b>${CCNA.REVIEW_GOAL} times in a row</b>, spaced out: today → next day → ${CCNA.REVIEW_STEPS[1]} days later. Missing it again starts it over.</p>
+      <section class="stats">
+        <div class="stat"><b>${due.length}</b><span>due now</span></div>
+        <div class="stat"><b>${queued.length - due.length}</b><span>waiting</span></div>
+        <div class="stat"><b>${mastered}</b><span>mastered</span></div>
+        <div class="stat"><b>${queued.length}</b><span>in the queue</span></div>
+      </section>
+      <div class="row">${due.length
+        ? `<button class="btn primary" id="start-review">Review ${due.length} due question${due.length === 1 ? "" : "s"}</button>`
+        : `<span class="muted">${queued.length ? "Nothing due right now — come back later." : "No mistakes to review. Get some quizzes done!"}</span>`}</div>
+      ${rows ? `<h3>Queue</h3><div class="table-wrap"><table class="days review-table">
+        <thead><tr><th>Question</th><th>Lesson</th><th class="center">Missed</th><th>Progress</th><th>Next</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>` : ""}
+    </section>`);
+    const b = document.getElementById("start-review");
+    if (b) b.onclick = startReview;
+  }
+
+  function startReview() {
+    const m = qById();
+    const ids = dueReview();
+    const before = new Set(CCNA.reviewMastered());
+    runQuiz({
+      title: "Mistakes review", questions: shuffle(ids.map((id) => m[id])), mock: false,
+      onFinish: (results) => {
+        const ok = results.filter((r) => r.ok).length;
+        const nowMastered = CCNA.reviewMastered().filter((id) => !before.has(id)).length;
+        const still = dueReview().length;
+        const score = pct(ok, results.length);
+        setView(`<section class="panel">
+          <h2>Mistakes review</h2>
+          <div class="score ${score >= 85 ? "ok-text" : score >= 70 ? "" : "bad-text"}">${ok}/${results.length}</div>
+          <p class="center muted">${ok} moved forward${nowMastered ? ` (${nowMastered} mastered 🎉)` : ""} · ${results.length - ok} back to the start${still ? ` · ${still} still due` : ""}</p>
+          <div class="row center">${still ? `<button class="btn primary" id="again">Go again (${still} due)</button>` : ""}
+            <a class="btn" href="#/review">Review queue</a> <a class="btn" href="#/">Dashboard</a></div>
+          ${reviewList(results)}</section>`);
+        const again = document.getElementById("again");
+        if (again) again.onclick = startReview;
+        updateBadges();
+      },
+    });
+  }
+
+  const updateBadges = () => {
+    const due = SRS.dueCount();
+    document.getElementById("due-badge").textContent = due ? due : "";
+    const rd = dueReview().length;
+    document.getElementById("review-badge").textContent = rd ? rd : "";
+  };
+
   // ---------- data / settings ----------
   function data() {
     setView(`<section class="panel">
@@ -718,9 +808,8 @@
     if (cleanup) { cleanup(); cleanup = null; }
     const [, view, arg] = (location.hash || "#/").split("/");
     document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("href") === `#/${view || ""}`));
-    ({ "": dashboard, topics: () => (arg ? topicPage(arg) : topicList()), cards: () => cards(arg), quiz: () => quiz(arg), mock, drills: () => (arg ? drill(arg) : drillList()), data }[view || ""] || dashboard)();
-    const due = SRS.dueCount();
-    document.getElementById("due-badge").textContent = due ? due : "";
+    ({ "": dashboard, review, topics: () => (arg ? topicPage(arg) : topicList()), cards: () => cards(arg), quiz: () => quiz(arg), mock, drills: () => (arg ? drill(arg) : drillList()), data }[view || ""] || dashboard)();
+    updateBadges();
   }
 
   // Load content for built days, then start.
@@ -732,11 +821,12 @@
     const done = async () => {
       if (missing.length) document.getElementById("warn").innerHTML = `Content file missing for: ${missing.join(", ")} — run <code>python3 tools/status.py</code>.`;
       await CCNA.sync.init();
+      CCNA.onSave.push(updateBadges); // keep the nav counters current after every answer/grade
       // Another device's progress arrived: refresh views that only display state (never a running quiz/cards/drill session).
       CCNA.onRemoteChange = () => {
         const [, view, arg] = (location.hash || "#/").split("/");
         if (!view || view === "topics" || view === "data" || (view === "drills" && !arg)) route();
-        else document.getElementById("due-badge").textContent = SRS.dueCount() || "";
+        else updateBadges();
       };
       window.addEventListener("hashchange", route);
       route();

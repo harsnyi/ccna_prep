@@ -231,3 +231,9 @@ pre.code.exhibit { margin: 8px 0; font-size: .85rem; white-space: pre; }
 .sync-pill.synced { color: var(--ok); background: var(--ok-bg); }
 .sync-pill.offline, .sync-pill.signedout { color: var(--bad); background: var(--bad-bg); }
 p .sync-pill { margin-left: 6px; }
+
+/* mistakes review */
+.dots { display: inline-flex; gap: 4px; vertical-align: middle; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.dots i.on { background: var(--ok); }
+.review-table td:first-child { min-width: 280px; }
