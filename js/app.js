@@ -252,11 +252,12 @@
       cb.addEventListener("change", () => {
         const id = cb.dataset.done;
         if (cb.checked) { S.done[id] = CCNA.today(); CCNA.logActivity("lessons"); } else delete S.done[id];
+        CCNA.touch(`done:${id}`);
         CCNA.save();
         dashboard();
       }));
     const ed = document.getElementById("exam-date");
-    ed.onchange = () => { S.settings.examDate = ed.value || null; CCNA.save(); dashboard(); };
+    ed.onchange = () => { S.settings.examDate = ed.value || null; CCNA.touch("settings"); CCNA.save(); dashboard(); };
   }
 
   // ---------- flashcards ----------
@@ -644,6 +645,7 @@
       const sid = b.dataset.understood;
       if (prog[sid]) delete prog[sid];
       else { prog[sid] = CCNA.today(); CCNA.logActivity("reading"); }
+      CCNA.touch(`guide:${id}/${sid}`);
       CCNA.save(); refresh();
     }));
     refresh();
@@ -664,7 +666,13 @@
   function data() {
     setView(`<section class="panel">
       <h2>Progress data</h2>
-      <p class="muted">Progress is stored in this browser's localStorage. Export it to back it up or move it to another browser.</p>
+      ${CCNA.sync.enabled
+        ? `<p>Progress is <b>synced across your devices</b> through the server (and kept in this browser, so it works offline too).
+             <span class="sync-pill ${CCNA.sync.status}">${{ synced: "✓ Synced", pending: "Saving…", syncing: "Syncing…", offline: "Offline — will retry", signedout: "Signed out" }[CCNA.sync.status] || ""}</span></p>
+           <p class="muted small">${CCNA.sync.lastSync ? `Last synced ${new Date(CCNA.sync.lastSync).toLocaleString()}` : "Not synced yet"}. Changes upload a moment after you make them.
+             <button class="btn sm" id="sync-now">Sync now</button></p>
+           <p class="muted small">Import replaces the progress on <b>all</b> devices; Reset clears it everywhere (the server keeps a backup).</p>`
+        : `<p class="muted">Progress is stored in this browser's localStorage (sync works on the hosted version). Export it to back it up or move it to another browser.</p>`}
       <div class="row"><button class="btn" id="exp">Export progress (JSON)</button>
         <label class="btn">Import progress<input type="file" id="imp" accept="application/json" hidden></label>
         <button class="btn danger" id="reset">Reset all progress</button></div>
@@ -683,16 +691,19 @@
     };
     document.getElementById("imp").onchange = (e) => {
       const f = e.target.files[0]; if (!f) return;
-      f.text().then((t) => { try { CCNA.importState(t); location.hash = "#/"; } catch (err) { e.target.closest("section").insertAdjacentHTML("beforeend", `<p class="bad-text">Import failed: ${esc(err.message)}</p>`); } });
+      f.text().then((t) => CCNA.importState(t)).then(() => { location.hash = "#/"; })
+        .catch((err) => e.target.closest("section").insertAdjacentHTML("beforeend", `<p class="bad-text">Import failed: ${esc(err.message)}</p>`));
     };
     const reset = document.getElementById("reset");
     reset.onclick = () => {
-      if (reset.dataset.armed) return CCNA.resetState();
-      reset.dataset.armed = "1"; reset.textContent = "Click again to confirm reset";
+      if (reset.dataset.armed) return CCNA.resetState().catch((err) => reset.insertAdjacentHTML("afterend", ` <span class="bad-text">${esc(err.message)}</span>`));
+      reset.dataset.armed = "1"; reset.textContent = CCNA.sync.enabled ? "Click again to reset on ALL devices" : "Click again to confirm reset";
     };
-    document.getElementById("sdate").onchange = (e) => { S.settings.examDate = e.target.value || null; CCNA.save(); };
-    document.getElementById("srev").onchange = (e) => { S.settings.reviewDays = Math.max(0, Math.min(60, +e.target.value || 0)); CCNA.save(); };
-    document.getElementById("npd").onchange = (e) => { S.settings.newPerDay = Math.max(0, +e.target.value || 0); CCNA.save(); };
+    document.getElementById("sdate").onchange = (e) => { S.settings.examDate = e.target.value || null; CCNA.touch("settings"); CCNA.save(); };
+    document.getElementById("srev").onchange = (e) => { S.settings.reviewDays = Math.max(0, Math.min(60, +e.target.value || 0)); CCNA.touch("settings"); CCNA.save(); };
+    document.getElementById("npd").onchange = (e) => { S.settings.newPerDay = Math.max(0, +e.target.value || 0); CCNA.touch("settings"); CCNA.save(); };
+    const syncNow = document.getElementById("sync-now");
+    if (syncNow) syncNow.onclick = () => { syncNow.disabled = true; CCNA.sync.now().catch(() => {}).finally(() => data()); };
   }
 
   function notBuilt(m) {
@@ -718,8 +729,15 @@
     const guides = CCNA.topics().filter((t) => t.guide);
     let pending = built.length + guides.length;
     const missing = [];
-    const done = () => {
+    const done = async () => {
       if (missing.length) document.getElementById("warn").innerHTML = `Content file missing for: ${missing.join(", ")} — run <code>python3 tools/status.py</code>.`;
+      await CCNA.sync.init();
+      // Another device's progress arrived: refresh views that only display state (never a running quiz/cards/drill session).
+      CCNA.onRemoteChange = () => {
+        const [, view, arg] = (location.hash || "#/").split("/");
+        if (!view || view === "topics" || view === "data" || (view === "drills" && !arg)) route();
+        else document.getElementById("due-badge").textContent = SRS.dueCount() || "";
+      };
       window.addEventListener("hashchange", route);
       route();
     };

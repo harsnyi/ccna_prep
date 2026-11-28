@@ -45,6 +45,7 @@
     newLog: {},        // yyyy-mm-dd -> new cards introduced
     activity: {},      // yyyy-mm-dd -> {cards, questions, drills, lessons, reading}
     guides: {},        // topicId -> {sectionId: "yyyy-mm-dd" marked understood}
+    stamps: {},        // change times (ms) for things that can be switched off again — used by sync (js/merge.js)
     settings: { newPerDay: 20, examDate: null, reviewDays: 14 },
   });
   let state;
@@ -52,15 +53,25 @@
   try { state = load(JSON.parse(localStorage.getItem(KEY) || "{}")); }
   catch (e) { state = blank(); }
   CCNA.state = state;
-  CCNA.save = () => localStorage.setItem(KEY, JSON.stringify(state));
+  CCNA.normalize = load;
+  CCNA.saveLocal = () => localStorage.setItem(KEY, JSON.stringify(state));
+  CCNA.onSave = [];   // js/sync.js hooks in here
+  CCNA.save = () => { CCNA.saveLocal(); CCNA.onSave.forEach((f) => f()); };
+  /** Record when something that can be undone changed (lesson tick, guide section, settings) so sync keeps the newest. */
+  CCNA.touch = (key) => { state.stamps[key] = Date.now(); };
   CCNA.exportState = () => JSON.stringify(state, null, 2);
-  CCNA.importState = (json) => {
+  CCNA.importState = async (json) => {
     const parsed = JSON.parse(json);
     Object.keys(state).forEach((k) => delete state[k]);
     Object.assign(state, load(parsed));
-    CCNA.save();
+    CCNA.saveLocal();
+    if (CCNA.sync && CCNA.sync.enabled) await CCNA.sync.replaceRemote();
   };
-  CCNA.resetState = () => { localStorage.removeItem(KEY); location.reload(); };
+  CCNA.resetState = async () => {
+    if (CCNA.sync && CCNA.sync.enabled) await CCNA.sync.resetRemote();
+    localStorage.removeItem(KEY);
+    location.reload();
+  };
 
   CCNA.recordAnswer = (qid, correct) => {
     const a = (state.answers[qid] = state.answers[qid] || { right: 0, wrong: 0, last: null });

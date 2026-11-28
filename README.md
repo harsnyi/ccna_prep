@@ -15,7 +15,13 @@ ACCESS_PIN=0000 node server.js     # local test → http://localhost:8080
 railway up --service ccna-prep      # redeploy after changes
 ```
 
-Railway variables: `ACCESS_PIN` (required) and `SESSION_SECRET` (signs the cookies; changing it logs everyone out). Progress is still stored in each browser's localStorage, per site. To move progress between the local copy and the hosted one, use **Data → Export / Import**.
+Railway variables: `ACCESS_PIN` (required), `SESSION_SECRET` (signs the cookies; changing it logs everyone out) and `DATA_DIR=/data` (a Railway volume).
+
+**Progress sync.** On the hosted version, progress syncs across devices through `/api/progress`. Each browser still works from localStorage, so it works offline, and syncs in the background: it pulls on start, when the tab becomes visible and every 2 minutes, and pushes shortly after every change. The header shows the sync status.
+- Devices never overwrite each other. Both sides are **merged** (`js/merge.js`, shared by browser and server): the flashcard with more reviews wins, best scores take the max, mocks and activity are combined. Lesson ticks, guide sections and settings carry timestamps, so unticking syncs too.
+- **Import** and **Reset** (Data page) apply to all devices. They start a new sync *epoch*, so other devices drop their old copy instead of uploading it again.
+- The server keeps `progress.json` plus one backup per day (last 14 days) and a copy before every reset or import, in `DATA_DIR/backups`.
+- Opened as a local file or with `python3 -m http.server`, sync stays off and the app works as before. To bring progress from a local copy, use **Data → Export** there and **Import** on the hosted site.
 
 ## What's inside
 

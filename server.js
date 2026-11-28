@@ -8,8 +8,11 @@
  *   SESSION_SECRET  optional — signs the session cookie; if unset, a random one is generated
  *                   at startup (everyone has to re-enter the PIN after each deploy/restart)
  *   PORT            set by Railway
+ *   DATA_DIR        where synced progress is stored (default ./.data; on Railway a volume, e.g. /data)
  *
- * The app itself stays a static site: progress is still stored in each browser's localStorage.
+ * Progress sync: browsers keep working from localStorage and sync through /api/progress.
+ * The server merges every upload into the stored state (js/merge.js), so devices never overwrite
+ * each other. "epoch" increases on reset/import so other devices drop their old copy instead of re-uploading it.
  */
 const http = require("http");
 const fs = require("fs");
@@ -24,6 +27,10 @@ if (!PIN) {
 const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const PORT = Number(process.env.PORT) || 8080;
 const ROOT = __dirname;
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, ".data");
+const STORE = path.join(DATA_DIR, "progress.json");
+const BACKUPS = path.join(DATA_DIR, "backups");
+const mergeState = require("./js/merge.js");
 const COOKIE = "ccna_session";
 const SESSION_DAYS = 30;
 
@@ -76,6 +83,65 @@ const loginPage = (msg = "") => `<!doctype html><html lang="en"><head><meta char
   ${msg ? `<p class="err">${msg}</p>` : ""}
 </form></body></html>`;
 
+// ---- progress storage: {epoch, rev, updatedAt, state} ----
+fs.mkdirSync(BACKUPS, { recursive: true });
+const blankDoc = () => ({ epoch: 1, rev: 0, updatedAt: null, state: {} });
+let doc;
+try { doc = JSON.parse(fs.readFileSync(STORE, "utf8")); } catch (e) { doc = blankDoc(); }
+const writeAtomic = (file, data) => { const tmp = `${file}.${process.pid}.tmp`; fs.writeFileSync(tmp, data); fs.renameSync(tmp, file); };
+const persist = () => {
+  doc.rev++; doc.updatedAt = new Date().toISOString();
+  const json = JSON.stringify(doc);
+  writeAtomic(STORE, json);
+  // one backup per day, keep the last 14
+  const day = doc.updatedAt.slice(0, 10);
+  writeAtomic(path.join(BACKUPS, `progress-${day}.json`), json);
+  fs.readdirSync(BACKUPS).filter((f) => /^progress-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort().slice(0, -14)
+    .forEach((f) => fs.unlinkSync(path.join(BACKUPS, f)));
+};
+const backupNow = (tag) => writeAtomic(path.join(BACKUPS, `before-${tag}-${Date.now()}.json`), JSON.stringify(doc));
+
+const json = (res, code, body) => {
+  res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+  res.end(JSON.stringify(body));
+};
+const readJson = (req, limit, cb) => {
+  let body = "", over = false;
+  req.on("data", (c) => { if (over) return; body += c; if (body.length > limit) over = true; });
+  req.on("end", () => {
+    if (over) return cb(new Error("too large"));
+    try { cb(null, JSON.parse(body || "{}")); } catch (e) { cb(e); }
+  });
+};
+
+function api(req, res, url) {
+  const meta = () => ({ epoch: doc.epoch, rev: doc.rev, updatedAt: doc.updatedAt });
+  if (req.method === "GET") return json(res, 200, { ...meta(), state: doc.state });
+  if (req.method === "DELETE") { // reset all progress
+    backupNow("reset");
+    doc = { ...blankDoc(), epoch: doc.epoch + 1, rev: doc.rev };
+    persist();
+    return json(res, 200, { ...meta(), state: doc.state });
+  }
+  if (req.method === "PUT") {
+    return readJson(req, 5 * 1024 * 1024, (err, body) => {
+      if (err || !body || typeof body.state !== "object" || Array.isArray(body.state)) return json(res, 400, { error: "bad request" });
+      if (url.searchParams.get("replace") === "1") { // import: replace everything, start a new epoch
+        backupNow("import");
+        doc = { ...doc, epoch: doc.epoch + 1, state: body.state };
+        persist();
+        return json(res, 200, { ...meta(), state: doc.state });
+      }
+      // A device that synced before a reset/import must not push its stale copy back.
+      if (body.epoch !== undefined && body.epoch !== null && body.epoch < doc.epoch) return json(res, 409, { ...meta(), state: doc.state });
+      const merged = mergeState(doc.state, body.state);
+      if (JSON.stringify(merged) !== JSON.stringify(doc.state)) { doc.state = merged; persist(); }
+      return json(res, 200, { ...meta(), state: doc.state });
+    });
+  }
+  res.writeHead(405, { Allow: "GET, PUT, DELETE" }); res.end();
+}
+
 const send = (res, code, body, headers = {}) => {
   res.writeHead(code, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", ...headers });
   res.end(body);
@@ -113,7 +179,12 @@ const server = http.createServer((req, res) => {
 
   if (p === "/logout") return send(res, 303, "", { Location: "/", "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
 
-  if (!validSession(cookies(req)[COOKIE])) return send(res, 401, loginPage());
+  if (!validSession(cookies(req)[COOKIE])) {
+    if (p.startsWith("/api/")) return json(res, 401, { error: "not signed in" });
+    return send(res, 401, loginPage());
+  }
+
+  if (p === "/api/progress") return api(req, res, url);
 
   const file = p === "/" ? "/index.html" : p;
   if (!PUBLIC.some((re) => re.test(file))) return send(res, 404, "Not found", { "Content-Type": "text/plain" });
