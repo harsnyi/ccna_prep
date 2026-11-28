@@ -37,7 +37,7 @@ window.CCNA_TOPICS = [
    "lessons": ["d16", "d17", "d18", "d19"], "drills": [],
    "summary": "Access and trunk ports, 802.1Q tagging, native VLAN, inter-VLAN routing (ROAS, SVIs), DTP and VTP.",
    "focus": ["switchport mode access / trunk, allowed VLANs", "802.1Q tag (4 bytes), native VLAN is untagged", "Router-on-a-stick subinterfaces + encapsulation dot1q", "SVIs on a multilayer switch", "DTP modes and why to disable; VTP server/client/transparent"]},
-  {"id": "stp", "title": "Spanning Tree & Rapid STP", "domain": "access", "blueprint": ["2.5"], "weight": "core", "guide": false,
+  {"id": "stp", "title": "Spanning Tree & Rapid STP", "domain": "access", "blueprint": ["2.5"], "weight": "core", "guide": true,
    "lessons": ["d20", "d21", "d22"], "drills": [],
    "summary": "Root bridge election, port roles and states, path cost, timers, RSTP improvements and PortFast/BPDU Guard.",
    "focus": ["Bridge ID = priority (+ VLAN) + MAC; lowest wins", "Root port → designated port → blocked, tie-breakers", "Port costs (100M=19, 1G=4, 10G=2)", "STP states and timers vs RSTP discarding/learning/forwarding", "Alternate vs backup ports; PortFast, BPDU Guard"]},

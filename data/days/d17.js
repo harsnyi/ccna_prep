@@ -1,0 +1,29 @@
+CCNA.addDay("d17", {
+  "cards": [
+    {"id": "d17-c01", "front": "Why use a **trunk**?", "back": "To carry **multiple VLANs over one link** instead of one physical link per VLAN."},
+    {"id": "d17-c02", "front": "ISL vs 802.1Q?", "back": "ISL: Cisco-proprietary, obsolete. **IEEE 802.1Q** (dot1q): the open standard, and the only one the CCNA needs."},
+    {"id": "d17-c03", "front": "Size and position of the 802.1Q tag?", "back": "**4 bytes**, inserted between the **source MAC** and the **Type/Length** field."},
+    {"id": "d17-c04", "front": "802.1Q tag fields?", "back": "**TPID** (16 bits, always 0x8100) + **TCI**: PCP (3 bits, priority), DEI (1 bit, drop eligible), **VID (12 bits, VLAN ID)**"},
+    {"id": "d17-c05", "front": "Usable VLAN IDs, and why?", "back": "**1–4094**. The 12-bit VID gives 0–4095, and 0 and 4095 are reserved."},
+    {"id": "d17-c06", "front": "What is the **native VLAN**?", "back": "The VLAN whose frames cross an 802.1Q trunk **untagged** (default VLAN 1). It must match on both ends."},
+    {"id": "d17-c07", "front": "Commands for a trunk with VLANs 10, 20, 30 and native VLAN 1001?", "back": "`switchport mode trunk` · `switchport trunk allowed vlan 10,20,30` · `switchport trunk native vlan 1001`"},
+    {"id": "d17-c08", "front": "When do you need `switchport trunk encapsulation dot1q`?", "back": "On switches that support **both ISL and 802.1Q** (encapsulation defaults to negotiate); otherwise `switchport mode trunk` is rejected."},
+    {"id": "d17-c09", "front": "How do you add VLAN 40 to a trunk without removing the others?", "back": "`switchport trunk allowed vlan **add** 40`. Without `add`, the list is **replaced**."},
+    {"id": "d17-c10", "front": "How do you verify trunks?", "back": "`show interfaces trunk`: mode, encapsulation, status, native VLAN, and the allowed/active VLANs."},
+    {"id": "d17-c11", "front": "What is **router-on-a-stick**?", "back": "Inter-VLAN routing with **one router interface** split into **subinterfaces** (one per VLAN), connected to a switch **trunk**."},
+    {"id": "d17-c12", "front": "ROAS subinterface configuration?", "back": "`interface g0/0.10` → `encapsulation dot1q 10` → `ip address 192.168.10.62 255.255.255.192`. The physical interface needs `no shutdown`."},
+    {"id": "d17-c13", "front": "Must the subinterface number match the VLAN?", "back": "No, it's just a label; `encapsulation dot1q <vlan>` sets the VLAN. Matching them is good practice."}
+  ],
+  "questions": [
+    {"id": "d17-q01", "type": "single", "q": "What value is in the TPID field of an 802.1Q tag?", "options": ["0x0800", "0x8100", "0x86DD", "0x0806"], "answer": [1], "explain": "0x8100 marks the frame as tagged (0x0800 = IPv4, 0x86DD = IPv6, 0x0806 = ARP)."},
+    {"id": "d17-q02", "type": "single", "q": "How many bits of the 802.1Q tag identify the VLAN?", "options": ["8", "10", "12", "16"], "answer": [2], "explain": "The VID is 12 bits (0–4095)."},
+    {"id": "d17-q03", "type": "single", "q": "Where is the 802.1Q tag inserted in an Ethernet frame?", "options": ["Before the destination MAC", "Between the source MAC and the Type/Length field", "After the FCS", "Inside the IP header"], "answer": [1], "explain": "It goes right after the source MAC address."},
+    {"id": "d17-q04", "type": "single", "q": "Which command makes an interface a static 802.1Q trunk (on a switch that only supports dot1q)?", "options": ["switchport mode trunk", "switchport trunk enable", "trunk mode dot1q", "switchport mode dynamic auto"], "answer": [0], "explain": "On ISL-capable switches you'd first need `switchport trunk encapsulation dot1q`."},
+    {"id": "d17-q05", "type": "single", "q": "Exhibit:\n```\nSW1# show interfaces trunk\nPort        Mode         Encapsulation  Status        Native vlan\nGi0/1       on           802.1q         trunking      1\n\nPort        Vlans allowed on trunk\nGi0/1       1,10,30\n```\nHosts in VLAN 20 on SW1 can't reach VLAN 20 hosts behind Gi0/1. Why?", "options": ["Gi0/1 isn't trunking", "VLAN 20 isn't allowed on the trunk", "The native VLAN is wrong", "Gi0/1 uses ISL"], "answer": [1], "explain": "Only VLANs 1, 10 and 30 are allowed. Fix it with `switchport trunk allowed vlan add 20`."},
+    {"id": "d17-q06", "type": "single", "q": "A trunk allows VLANs 10,20,30. Which command adds VLAN 40 and keeps the rest?", "options": ["switchport trunk allowed vlan 40", "switchport trunk allowed vlan add 40", "switchport trunk vlan 40", "switchport access vlan 40"], "answer": [1], "explain": "Without `add`, the allowed list would become only VLAN 40."},
+    {"id": "d17-q07", "type": "single", "q": "How are native VLAN frames sent on an 802.1Q trunk?", "options": ["Tagged with VLAN 1", "Untagged", "Double tagged", "They aren't sent"], "answer": [1], "explain": "That's the defining feature of the native VLAN."},
+    {"id": "d17-q08", "type": "single", "q": "Which subinterface command makes g0/0.20 handle VLAN 20 frames?", "options": ["switchport access vlan 20", "encapsulation dot1q 20", "vlan 20", "ip vlan 20"], "answer": [1], "explain": "`encapsulation dot1q 20` maps the subinterface to VLAN 20."},
+    {"id": "d17-q09", "type": "multi", "q": "Which two fields are part of the 802.1Q tag? (Choose two.)", "options": ["PCP", "VID", "FCS", "SFD", "TTL"], "answer": [0, 1], "explain": "The tag is TPID + TCI (PCP, DEI, VID). FCS and SFD are Ethernet frame fields; TTL is in the IP header."},
+    {"id": "d17-q10", "type": "multi", "q": "Which two statements about router-on-a-stick are true? (Choose two.)", "options": ["One physical router interface is split into subinterfaces", "The switch port facing the router is a trunk", "The router needs one physical interface per VLAN", "It requires a multilayer switch", "Subinterface numbers must equal the VLAN ID"], "answer": [0, 1], "explain": "Subinterface numbers are labels; the encapsulation sets the VLAN."}
+  ]
+});
