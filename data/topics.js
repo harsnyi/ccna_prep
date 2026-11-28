@@ -33,7 +33,7 @@ window.CCNA_TOPICS = [
    "lessons": ["d55", "d56", "d57", "d58"], "drills": [],
    "summary": "RF basics, 802.11 standards, AP modes and WLC architectures, WPA2/WPA3 and configuring a WLAN in the WLC GUI.",
    "focus": ["2.4 GHz non-overlapping channels 1/6/11", "BSS, ESS, SSID, BSSID", "Autonomous vs lightweight (CAPWAP) vs cloud-based APs", "AP modes: local, FlexConnect, monitor, sniffer, bridge…", "WPA2-PSK vs WPA2-Enterprise (802.1X), WPA3 SAE"]},
-  {"id": "vlans", "title": "VLANs & Trunking", "domain": "access", "blueprint": ["2.1", "2.2"], "weight": "core", "guide": false,
+  {"id": "vlans", "title": "VLANs & Trunking", "domain": "access", "blueprint": ["2.1", "2.2"], "weight": "core", "guide": true,
    "lessons": ["d16", "d17", "d18", "d19"], "drills": [],
    "summary": "Access and trunk ports, 802.1Q tagging, native VLAN, inter-VLAN routing (ROAS, SVIs), DTP and VTP.",
    "focus": ["switchport mode access / trunk, allowed VLANs", "802.1Q tag (4 bytes), native VLAN is untagged", "Router-on-a-stick subinterfaces + encapsulation dot1q", "SVIs on a multilayer switch", "DTP modes and why to disable; VTP server/client/transparent"]},
