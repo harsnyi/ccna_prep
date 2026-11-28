@@ -6,6 +6,17 @@ Local study app built on top of [`../CCNA_Course_Notes`](../CCNA_Course_Notes) (
 (Optional: `python3 -m http.server` in this folder, then open http://localhost:8000.)
 Progress is saved in the browser's localStorage — use **Data → Export** to back it up.
 
+### Hosted version (Railway)
+
+`server.js` is a dependency-free Node server that serves the app behind a **PIN screen**. The PIN is checked on the server, a signed 30-day session cookie is set, and 5 wrong PINs lock that IP out for 15 minutes.
+
+```bash
+ACCESS_PIN=0000 node server.js     # local test → http://localhost:8080
+railway up --service ccna-prep      # redeploy after changes
+```
+
+Railway variables: `ACCESS_PIN` (required) and `SESSION_SECRET` (signs the cookies; changing it logs everyone out). Progress is still stored in each browser's localStorage, per site. To move progress between the local copy and the hosted one, use **Data → Export / Import**.
+
 ## What's inside
 
 | View | What it does |

@@ -1,0 +1,12 @@
+{
+  "name": "ccna-prep",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CCNA 200-301 study app (static) with a PIN-gated server for hosting",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
