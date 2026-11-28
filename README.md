@@ -34,7 +34,7 @@ Railway variables: `ACCESS_PIN` (required), `SESSION_SECRET` (signs the cookies;
 | **Review** | Mistakes review queue. Every question you get wrong in a quiz, mock or review comes back until you answer it right 3 times in a row, spaced out: due now → next day → 3 days later → mastered. A miss starts it over; correct answers before a question is due don't count. Questions you'd already missed are added to the queue automatically. The nav badge shows how many are due. |
 | **Quiz** (per day) | Exam-style single/multi-choice with immediate explanation + link back to the note. Keys: `A–E` select, `Enter` next. Best score is tracked. |
 | **Mock exam** | Draws from all built days using blueprint weights, timed (1.2 min/question), no feedback until the end, no going back. Per-domain breakdown. |
-| **Drills** | Generated, endless: subnet calculator, prefix↔mask, hosts→prefix, wildcard masks, binary↔decimal, IPv6 shortening, EUI-64, OSPF cost. Tracks accuracy, streaks and fastest time. |
+| **Drills** | Generated, endless: subnet calculator, prefix↔mask, hosts→prefix, wildcard masks, binary↔decimal, IPv6 shortening, EUI-64, OSPF cost, plus two exhibit drills: **ACL evaluation** (a generated `show access-lists` and a packet: permit or deny, and which line matched, with a line-by-line walk-through) and **longest-prefix match** (a generated `show ip route`: which route and next hop a destination uses, including default and drop cases). Tracks accuracy, streaks and fastest time. |
 
 ## Content build tracking
 

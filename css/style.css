@@ -237,3 +237,10 @@ p .sync-pill { margin-left: 6px; }
 .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
 .dots i.on { background: var(--ok); }
 .review-table td:first-child { min-width: 280px; }
+
+/* exhibit drills */
+.drill-prompt pre, .drill-prompt p { text-align: left; }
+.drill-prompt pre.exhibit { font-size: .82rem; }
+.drill-prompt .big.mono { font-size: 1.3rem; }
+ol.walk { margin: 6px 0; padding-left: 4px; list-style: none; }
+ol.walk li { margin: 2px 0; }

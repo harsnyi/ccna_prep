@@ -295,7 +295,8 @@ CCNA.addGuide("acls", {
         - **Numbers**: 1–99 / 1300–1999 standard, 100–199 / 2000–2699 extended.
 
         > [!key] Practice
-        > Use the **Wildcard masks** drill below until it's instant, then do the Day 34–35 quizzes.
+        > Do the **ACL evaluation** drill below: it generates an ACL and a packet every round, and the
+        > explanation walks through each line. Keep the **Wildcard masks** drill going until it's instant, then do the Day 34–35 quizzes.
       `,
       checks: [
         { q: "An inbound ACL on R1's G0/0 is `permit tcp any any eq 22`. R1 runs OSPF out of G0/0. What breaks?", a: "The OSPF adjacency on G0/0 — Hellos (IP protocol 89) arriving inbound hit the implicit deny. All non-SSH traffic is dropped too." },
